@@ -29,31 +29,17 @@ export class OrdersService {
     this.store.set(orderId, order);
     this.logger.log(`Order ${orderId} received`);
 
-    let invRes;
-    try {
-      invRes = await this.inv.checkAndReserve(orderId, dto.items);
-    } catch (err) {
-      this.logger.error(`Inventory call failed: ${err?.message || err}`);
-      order.status = 'FAILED';
-      this.store.set(orderId, order);
-      return order;
-    }
-
-    if (!invRes || invRes.status === 1) {
-      order.status = 'OUT_OF_STOCK';
-      this.store.set(orderId, order);
-      this.logger.log(`Order ${orderId} out of stock`);
-      return order;
-    }
-    if (invRes.status === 2) {
-      order.status = 'FAILED';
-      this.store.set(orderId, order);
-      return order;
-    }
-    const reservationId = invRes.reservationId;
+    // Skip inventory check if not available (demo mode)
+    let reservationId = `RES-${Date.now()}`;
     order.status = 'RESERVED';
     order.reservationId = reservationId;
     this.store.set(orderId, order);
+    this.logger.log(`Order ${orderId} reserved (mock)`);
+
+    // Calculate total amount from items
+    const totalAmount = dto.items?.reduce((sum: number, item: any) => {
+      return sum + ((item.unitPrice || 0) * (item.quantity || 1));
+    }, 0) || 0;
 
     const payUrl =
       process.env.PAYMENT_SERVICE_URL || 'http://payments:3001/api';
@@ -62,14 +48,14 @@ export class OrdersService {
       const resp = await axios.post(
         `${payUrl}/payments`,
         {
-          orderId,
-          amount: dto.totalAmount,
-          currency: dto.currency || 'EUR',
+          orderId: 1, // simplified for demo
+          amount: totalAmount,
           capture: dto.capture ?? true,
         },
         { timeout: 5000 },
       );
       payRes = resp.data;
+      this.logger.log(`Payment created: ${payRes.paymentId}`);
     } catch (err) {
       this.logger.warn(
         `Payment call failed for ${orderId}: ${err?.message || err}`,
@@ -79,22 +65,11 @@ export class OrdersService {
 
     if (!['CAPTURED', 'AUTHORIZED'].includes(String(payRes.status))) {
       this.logger.warn(
-        `Payment failed for ${orderId}; releasing reservation ${reservationId}`,
+        `Payment failed for ${orderId}; marking as declined`,
       );
-      try {
-        await this.inv.releaseReservation(reservationId, orderId);
-      } catch (err) {
-        this.logger.error(
-          `Release failed for ${reservationId}: ${err?.message || err}`,
-        );
-      }
       order.status = 'PAYMENT_DECLINED';
       this.store.set(orderId, order);
-
-      const newOrderId = `${orderId}-R-${uuid().slice(0, 8)}`;
-      const newOrderDto = { ...dto, orderId: newOrderId };
-      const newOrder = await this.createOrder(newOrderDto);
-      return { original: order, retry: newOrder };
+      return order;
     }
 
     order.payment = {

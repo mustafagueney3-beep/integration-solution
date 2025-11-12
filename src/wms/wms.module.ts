@@ -17,6 +17,17 @@ import { ClientsModule, Transport } from '@nestjs/microservices';
           },
         },
       },
+      {
+        name: 'LOG_CLIENT',
+        transport: Transport.RMQ,
+        options: {
+          urls: ['amqp://guest:guest@127.0.0.1:5672'],
+          queue: 'logs_queue',
+          queueOptions: {
+            durable: false,
+          },
+        },
+      },
     ]),
   ],
   providers: [WmsBus, OrdersStatusUpdater],

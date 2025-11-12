@@ -1,4 +1,4 @@
-import { IsNumber, Min } from 'class-validator';
+import { IsNumber, Min, IsBoolean, IsOptional } from 'class-validator';
 
 export class PaymentCreateDto {
   @IsNumber()
@@ -7,4 +7,8 @@ export class PaymentCreateDto {
   @IsNumber()
   @Min(1)
   amount!: number;
+
+  @IsBoolean()
+  @IsOptional()
+  capture?: boolean;
 }

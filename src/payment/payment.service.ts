@@ -14,7 +14,8 @@ export class PaymentsService {
 
   async create(dto: PaymentCreateDto) {
     const p = this.repo.create({
-      ...dto,
+      orderId: String(dto.orderId),
+      amount: dto.amount,
       status: 'PENDING',
       updatedAt: new Date(),
     });

@@ -12,7 +12,6 @@ export class WmsBus implements OnModuleInit {
   private conn!: amqp.Connection;
   private pub!: amqp.Channel;
   private sub!: amqp.Channel;
-  private channel: amqp.Channel;
   private readonly exchange = 'wms';
 
   constructor(
@@ -24,18 +23,30 @@ export class WmsBus implements OnModuleInit {
     try {
       await this.statusClient.connect();
       await this.logClient.connect();
+      // Initialize RabbitMQ connection if needed
+      try {
+        this.conn = await amqp.connect('amqp://guest:guest@127.0.0.1:5672');
+        this.pub = await this.conn.createChannel();
+        this.sub = await this.conn.createChannel();
+        await this.pub.assertExchange(this.exchange, 'topic', { durable: true });
+      } catch (err) {
+        console.warn('RabbitMQ channel setup failed (optional):', err);
+      }
       console.log('WMS Clients verbunden');
     } catch (error) {
       console.error('FEHLER: WMS Clients konnten sich nicht verbinden', error);
     }
   }
   async publishFulfillmentCreated(payload: any) {
-    if (!this.channel) throw new Error('RabbitMQ channel not ready');
+    if (!this.pub) {
+      console.warn('RabbitMQ publisher not ready, skipping publish');
+      return;
+    }
     const msg = {
       ...payload,
       occurredAt: new Date().toISOString(),
     };
-    this.channel.publish(
+    this.pub.publish(
       this.exchange,
       'fulfillment.created',
       Buffer.from(JSON.stringify(msg)),
@@ -51,6 +62,10 @@ export class WmsBus implements OnModuleInit {
     queueName: string,
     onMessage: (msg: any) => Promise<void>,
   ) {
+    if (!this.sub) {
+      console.warn('RabbitMQ subscriber not ready');
+      return;
+    }
     await this.sub.consume(
       queueName,
       async (msg) => {

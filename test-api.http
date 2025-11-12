@@ -1,0 +1,57 @@
+### Test API Endpoints
+@baseUrl = http://localhost:3000/api
+@correlationId = {{$guid}}
+
+### 1. Create an Order
+POST {{baseUrl}}/orders
+Content-Type: application/json
+X-Correlation-Id: {{correlationId}}
+
+{
+  "customerId": "CUST-12345",
+  "items": [
+    {
+      "sku": "WIDGET-001",
+      "quantity": 2,
+      "unitPrice": 29.99
+    },
+    {
+      "sku": "GADGET-002",
+      "quantity": 1,
+      "unitPrice": 49.99
+    }
+  ]
+}
+
+### 2. Get Order by ID
+# Ersetze ORDER-ID mit der ID aus Schritt 1
+GET {{baseUrl}}/orders/ORDER-ID
+X-Correlation-Id: {{correlationId}}
+
+### 3. Create Payment (with capture)
+POST {{baseUrl}}/payments
+Content-Type: application/json
+X-Correlation-Id: {{correlationId}}
+
+{
+  "orderId": 1,
+  "amount": 109.97,
+  "capture": true
+}
+
+### 4. Create Payment (without capture - only authorize)
+POST {{baseUrl}}/payments
+Content-Type: application/json
+X-Correlation-Id: {{correlationId}}
+
+{
+  "orderId": 1,
+  "amount": 109.97,
+  "capture": false
+}
+
+### 5. Check OpenAPI Spec
+GET http://localhost:3000/openapi/oms-openapi.yaml
+
+### 6. Health Check (Docs)
+GET http://localhost:3000/docs
